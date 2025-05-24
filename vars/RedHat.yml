@@ -1,0 +1,3 @@
+---
+# RedHat/CentOS-specific variables
+wireguard_package: wireguard-tools

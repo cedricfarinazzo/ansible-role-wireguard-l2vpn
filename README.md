@@ -1,93 +1,265 @@
-# ansible-role-wireguard-l2vpn
+# Ansible Role: Wireguard L2VPN
 
+An Ansible Role that sets up a full mesh Wireguard network between all hosts, configures a VXLAN interface over the Wireguard network, and creates a bridge interface with a static IP.
 
+## Requirements
 
-## Getting started
+- Linux hosts with systemd-networkd
+- Python for Ansible
+- Internet connectivity to install packages
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Role Variables
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+Available variables are listed below, along with default values (see `defaults/main.yml`):
 
-## Add your files
+```yaml
+# Wireguard package and service settings
+wireguard_package: wireguard
+wireguard_package_state: present
+wireguard_service_state: started
+wireguard_service_enabled: true
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+# Wireguard network configuration
+wireguard_port: 51820
+wireguard_interface: wg0
+wireguard_address_prefix: "10.10.10"
+wireguard_netmask: 24
+
+# VXLAN configuration
+vxlan_interface: vxlan0
+vxlan_id: 42
+vxlan_port: 4789
+vxlan_multicast_group: "239.1.1.42"
+
+# Bridge configuration
+bridge_interface: br0
+bridge_address_prefix: "172.16.0"
+bridge_netmask: 24
+bridge_address_offset: "{{ inventory_hostname | ansible.utils.hash('sha1') | regex_replace('[^0-9]','') | truncate(2, True, '') | int + 10 }}"
+```
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+- hosts: servers
+  roles:
+    - wireguard-l2vpn
+```
+
+## Network Architecture
+
+This role configures a network with the following components:
+
+1. A full mesh Wireguard VPN between all hosts in the inventory
+2. A VXLAN interface (vxlan0) running on top of the Wireguard interface (wg0)
+3. A bridge interface (br0) that includes the VXLAN interface
+4. Static IP addressing on the bridge interface
+
+### Network Diagram
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/sed-infra-pegasus/ansible/ansible-role-wireguard-l2vpn.git
-git branch -M main
-git push -uf origin main
+                    Node 1                                   Node 2
+┌───────────────────────────────────┐    ┌───────────────────────────────────┐
+│                                   │    │                                   │
+│  ┌────────────┐                   │    │  ┌────────────┐                   │
+│  │ br0        │ 172.16.0.11/24    │    │  │ br0        │ 172.16.0.12/24    │
+│  └─────┬──────┘                   │    │  └─────┬──────┘                   │
+│        │                          │    │        │                          │
+│  ┌─────┴──────┐                   │    │  ┌─────┴──────┐                   │
+│  │ vxlan0     │ Multicast: 239.1.1.42   │  │ vxlan0     │ VNI: 42          │
+│  └─────┬──────┘                   │    │  └─────┬──────┘                   │
+│        │                          │    │        │                          │
+│  ┌─────┴──────┐                   │    │  ┌─────┴──────┐                   │
+│  │ wg0        │ 10.10.10.1/24     │    │  │ wg0        │ 10.10.10.2/24     │
+│  └─────┬──────┘                   │    │  └─────┬──────┘                   │
+└────────┼──────────────────────────┘    └────────┼──────────────────────────┘
+         │                                        │
+         │                                        │
+         └───────────────WireGuard───────────────┐│
+                         Full Mesh                │
+         ┌────────────────────────────────────────┘
+         │
+┌────────┼──────────────────────────┐
+│        │                          │
+│  ┌─────┴──────┐                   │
+│  │ wg0        │ 10.10.10.3/24     │
+│  └─────┬──────┘                   │
+│        │                          │
+│  ┌─────┴──────┐                   │
+│  │ vxlan0     │ VXLAN Port: 4789  │
+│  └─────┬──────┘                   │
+│        │                          │
+│  ┌─────┴──────┐                   │
+│  │ br0        │ 172.16.0.13/24    │
+│  └────────────┘                   │
+│                                   │
+└───────────────────────────────────┘
+           Node 3
 ```
 
-## Integrate with your tools
+## How It Works
 
-- [ ] [Set up project integrations](https://gitlab.com/sed-infra-pegasus/ansible/ansible-role-wireguard-l2vpn/-/settings/integrations)
+1. **Wireguard Setup**: Each host generates a private/public key pair and creates a Wireguard interface with connections to all other hosts.
+2. **VXLAN Layer**: A VXLAN interface is created to encapsulate L2 traffic across the Wireguard network, using multicast address 239.1.1.42.
+3. **Bridge Configuration**: A bridge interface is set up with a static IP from the 172.16.0.0/24 range.
 
-## Collaborate with your team
+## Security Notes
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+- For production use, you should manage Wireguard keys securely through your Ansible vault or other secret management system.
+- The role automatically generates Wireguard keys if they are not provided.
 
-## Test and Deploy
+## Testing
 
-Use the built-in continuous integration in GitLab.
+This role includes Molecule tests to validate functionality in a multi-node cluster setup. To run the tests:
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+1. Make sure you have Docker installed and running with appropriate privileges
+2. Run the test script:
 
-***
+```bash
+./run-tests.sh
+```
 
-# Editing this README
+By default, the tests use Debian 11. You can specify a different distribution:
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```bash
+./run-tests.sh ubuntu2004  # Test with Ubuntu 20.04
+```
 
-## Suggestions for a good README
+### Test Environment
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+The testing environment:
+- Creates three Docker containers with the specified distribution
+- Configures a full mesh Wireguard network between the containers
+- Sets up VXLAN and bridge interfaces on each container
+- Verifies connectivity between the nodes
+- Tests the L2VPN functionality by checking ping connectivity
 
-## Name
-Choose a self-explaining name for your project.
+### Test Requirements
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+- Docker with elevated privileges (for network operations)
+- Python 3 with virtual environment support
+- Internet connectivity to download Docker images and packages
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+The advanced validation tests perform the following checks:
+- Interface existence and status verification
+- Full connectivity testing between all nodes
+- Bandwidth testing using iperf3
+- File transfer testing over the L2VPN
+- MTU verification across all interfaces
+- Multicast communication testing
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+You can also run these tests using the Makefile:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+make advanced-test
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### Test Environment
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+The testing environment:
+- Creates a Docker container with the specified distribution
+- Installs Wireguard and related packages
+- Configures all required interfaces and services
+- Verifies the setup is working correctly
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### Test Requirements
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+- Docker with elevated privileges (for network operations)
+- Python 3 with virtual environment support
+- Internet connectivity to download Docker images and packages
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+## Troubleshooting
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Common Issues
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+#### Wireguard Interface Not Coming Up
+
+If the Wireguard interface isn't coming up, check:
+
+```bash
+# Check if Wireguard kernel module is loaded
+lsmod | grep wireguard
+
+# Check Wireguard interface status
+ip link show wg0
+
+# Check Wireguard logs
+journalctl -u wg-quick@wg0
+```
+
+#### No Connectivity Between Nodes
+
+If nodes can't communicate over the L2VPN:
+
+1. Verify Wireguard connectivity:
+   ```bash
+   # Check Wireguard peers
+   wg show
+
+   # Check if Wireguard traffic is flowing
+   tcpdump -i wg0
+   ```
+
+2. Verify VXLAN configuration:
+   ```bash
+   # Check VXLAN interface
+   ip -d link show vxlan0
+   
+   # Check multicast routing
+   ip mroute show
+   ```
+
+3. Verify bridge configuration:
+   ```bash
+   # List bridge interfaces
+   brctl show
+   
+   # Check bridge forwarding
+   bridge fdb show
+   ```
+
+#### MTU Issues
+
+If you're experiencing packet fragmentation or connectivity problems:
+
+```bash
+# Check MTU on all relevant interfaces
+ip link show | grep mtu
+
+# Set appropriate MTU values (adjust as needed)
+ip link set dev wg0 mtu 1420
+ip link set dev vxlan0 mtu 1400
+ip link set dev br0 mtu 1400
+```
+
+Consider that the MTU for each interface should be set with overhead in mind:
+- Wireguard overhead: ~60 bytes
+- VXLAN overhead: ~50 bytes
+
+#### Firewall Issues
+
+Ensure your firewall allows:
+- UDP port 51820 (or your configured Wireguard port)
+- UDP port 4789 (VXLAN)
+- Protocol 112 (VRRP) if using VRRP
+- Multicast traffic (239.1.1.42)
+
+```bash
+# For iptables-based firewalls
+iptables -A INPUT -p udp --dport 51820 -j ACCEPT
+iptables -A INPUT -p udp --dport 4789 -j ACCEPT
+iptables -A INPUT -d 239.1.1.42/32 -j ACCEPT
+```
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT
+
+## Author Information
+
+This role was created by SEDINFRA team.

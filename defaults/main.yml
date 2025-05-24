@@ -1,0 +1,28 @@
+---
+# Wireguard package and service settings
+wireguard_package: wireguard
+wireguard_package_state: present
+wireguard_service_state: started
+wireguard_service_enabled: true
+
+# Wireguard network configuration
+wireguard_port: 51820
+wireguard_interface: wg0
+wireguard_address_prefix: "10.10.10"
+wireguard_netmask: 24
+
+# VXLAN configuration
+vxlan_interface: vxlan0
+vxlan_id: 42
+vxlan_port: 4789
+vxlan_multicast_group: "239.1.1.42"
+
+# Bridge configuration
+bridge_interface: br0
+bridge_address_prefix: "172.16.0"
+bridge_netmask: 24
+bridge_address_offset: "{{ groups['wireguard_nodes'].index(inventory_hostname) + 11 }}"
+
+# Wireguard Keys - should be overridden in host_vars or group_vars
+wireguard_private_key: "" 
+wireguard_public_key: ""

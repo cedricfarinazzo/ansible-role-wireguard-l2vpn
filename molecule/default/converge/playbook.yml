@@ -1,0 +1,24 @@
+---
+- name: Converge
+  hosts: wireguard_nodes
+  become: true
+  vars:
+    # Enable debug mode for container environments
+    molecule_docker_environment: true
+    
+  pre_tasks:
+    - name: Display virtualization type
+      ansible.builtin.debug:
+        msg: "Running in {{ ansible_virtualization_type }} environment"
+
+  roles:
+    - role: ../../../../ansible-role-wireguard-l2vpn
+  post_tasks:
+    - name: Gather facts about configured interfaces
+      ansible.builtin.command: ip -o link show
+      register: ip_link_output
+      changed_when: false
+      
+    - name: Display configured interfaces
+      ansible.builtin.debug:
+        msg: "{{ ip_link_output.stdout_lines }}"

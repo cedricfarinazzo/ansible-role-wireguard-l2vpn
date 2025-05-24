@@ -1,0 +1,5 @@
+---
+# Common variables for all operating systems
+
+# OS-specific package names and settings can be added here
+# These will be included based on the OS via the tasks/main.yml include_vars task

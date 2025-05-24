@@ -1,0 +1,74 @@
+---
+- name: Verify
+  hosts: wireguard_nodes
+  become: true
+  vars:
+    wireguard_interface: wg0
+    vxlan_interface: vxlan0
+    bridge_interface: br0
+    
+  tasks:
+    - name: Check virtualization type
+      debug:
+        msg: "Running in {{ ansible_virtualization_type }} environment"
+
+    - name: Check if Wireguard interface exists
+      command: ip link show {{ wireguard_interface }}
+      register: wg_interface_result
+      changed_when: false
+      failed_when: false
+      
+    - name: Display Wireguard interface info
+      debug:
+        msg: "{{ wg_interface_result.stdout_lines | default(['Not found']) }}"
+      
+    - name: Skip service check in Docker environment
+      set_fact:
+        skip_service_check: "{{ ansible_virtualization_type in ['docker', 'container', 'containerd'] }}"
+        
+    - name: Check if VXLAN interface exists
+      command: ip link show {{ vxlan_interface }}
+      register: vxlan_interface_result
+      changed_when: false
+      failed_when: false
+      
+    - name: Display VXLAN interface info
+      debug:
+        msg: "{{ vxlan_interface_result.stdout_lines | default(['Not found']) }}"
+      
+    - name: Check if Bridge interface exists
+      command: ip link show {{ bridge_interface }}
+      register: bridge_interface_result
+      changed_when: false
+      failed_when: false
+      
+    - name: Display Bridge interface info
+      debug:
+        msg: "{{ bridge_interface_result.stdout_lines | default(['Not found']) }}"
+      
+    # Test connectivity between nodes
+    - name: Test connectivity to other nodes
+      shell: |
+        ip a show dev {{ bridge_interface }} | grep -q "inet " && ping -c 1 -W 5 {{ bridge_address_prefix }}.{{ item }}
+      register: ping_result
+      failed_when: false
+      changed_when: false
+      with_items:
+        - 11  # node1 bridge IP offset
+        - 12  # node2 bridge IP offset
+        - 13  # node3 bridge IP offset
+      when: inventory_hostname != "node{{ item | regex_replace('1([0-9])', '\\1') }}"
+      
+    - name: Display ping results
+      debug:
+        msg: "Ping from {{ inventory_hostname }} to {{ bridge_address_prefix }}.{{ item.item }}: {{ 'Success' if item.rc == 0 else 'Failed' }}"
+      with_items: "{{ ping_result.results }}"
+      
+    - name: Verify Wireguard peers
+      command: wg show
+      register: wg_show_result
+      changed_when: false
+      
+    - name: Display Wireguard peer information
+      debug:
+        msg: "{{ wg_show_result.stdout_lines }}"

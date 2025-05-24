@@ -1,0 +1,10 @@
+[NetDev]
+Name={{ vxlan_interface }}
+Kind=vxlan
+
+[VXLAN]
+Id={{ vxlan_id }}
+Local={{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(inventory_hostname) + 10 }}
+Group={{ vxlan_multicast_group }}
+VNI={{ vxlan_id }}
+DestinationPort={{ vxlan_port }}

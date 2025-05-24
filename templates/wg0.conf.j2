@@ -1,0 +1,17 @@
+[Interface]
+Address = {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(inventory_hostname) + 10 }}/{{ wireguard_netmask }}
+ListenPort = {{ wireguard_port }}
+PrivateKey = {{ wireguard_private_key }}
+
+{% if groups['all'] | length > 1 %}
+{% for host in groups['all'] %}
+{% if host != inventory_hostname %}
+[Peer]
+# {{ host }}
+PublicKey = {{ hostvars[host]['wireguard_public_key'] }}
+AllowedIPs = {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(host) + 10 }}/32
+Endpoint = {{ hostvars[host]['ansible_default_ipv4']['address'] | default('127.0.0.1') }}:{{ wireguard_port }}
+PersistentKeepalive = 25
+{% endif %}
+{% endfor %}
+{% endif %}

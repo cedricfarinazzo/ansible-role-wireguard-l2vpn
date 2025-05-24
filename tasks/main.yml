@@ -1,0 +1,138 @@
+---
+# Include tasks based on the operating system family
+- name: Include OS-specific variables
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_os_family }}.yml"
+    - "{{ ansible_distribution }}.yml"
+    - default.yml
+  tags:
+    - always
+
+# Install required packages
+- name: Install required packages
+  package:
+    name: "{{ wireguard_package }}"
+    state: "{{ wireguard_package_state }}"
+  become: true
+  notify: restart wireguard
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Install network tools
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - bridge-utils
+    - iproute2
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Ensure Wireguard directory exists
+- name: Create Wireguard directory
+  file:
+    path: /etc/wireguard
+    state: directory
+    mode: '0700'
+  become: true
+
+# Generate wireguard keys
+- name: Generate Wireguard private key
+  shell: wg genkey > /etc/wireguard/privatekey && chmod 600 /etc/wireguard/privatekey
+  args:
+    creates: /etc/wireguard/privatekey
+  become: true
+
+- name: Read Wireguard private key
+  slurp:
+    src: /etc/wireguard/privatekey
+  register: wireguard_private_key_encoded
+  become: true
+
+- name: Set Wireguard private key fact
+  set_fact:
+    wireguard_private_key: "{{ wireguard_private_key_encoded['content'] | b64decode | trim }}"
+  when: wireguard_private_key_encoded is defined
+
+- name: Generate Wireguard public key from private key
+  shell: echo "{{ wireguard_private_key }}" | wg pubkey
+  register: wireguard_public_key_result
+  changed_when: false
+
+- name: Set Wireguard public key fact
+  set_fact:
+    wireguard_public_key: "{{ wireguard_public_key_result.stdout }}"
+
+# Exchange public keys (this is typically done via a host/group var file in a real-world scenario)
+- name: Gather facts from all hosts for key exchange
+  setup:
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  with_items: "{{ groups['all'] }}"
+  run_once: true
+  when: groups['all'] | length > 1
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Configure Wireguard full mesh
+- name: Generate wireguard configuration file
+  template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/{{ wireguard_interface }}.conf
+    mode: '0600'
+  become: true
+  notify: restart wireguard
+
+# Enable and start wireguard service
+- name: Enable and start Wireguard
+  service:
+    name: wg-quick@{{ wireguard_interface }}
+    state: "{{ wireguard_service_state }}"
+    enabled: "{{ wireguard_service_enabled }}"
+  become: true
+  register: wireguard_service
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Configure VXLAN interface
+- name: Create VXLAN interface
+  template:
+    src: vxlan.netdev.j2
+    dest: /etc/systemd/network/{{ vxlan_interface }}.netdev
+    mode: '0644'
+  become: true
+  notify: restart systemd-networkd
+
+- name: Configure VXLAN interface
+  template:
+    src: vxlan.network.j2
+    dest: /etc/systemd/network/{{ vxlan_interface }}.network
+    mode: '0644'
+  become: true
+  notify: restart systemd-networkd
+
+# Configure bridge interface
+- name: Create bridge interface
+  template:
+    src: bridge.netdev.j2
+    dest: /etc/systemd/network/{{ bridge_interface }}.netdev
+    mode: '0644'
+  become: true
+  notify: restart systemd-networkd
+
+- name: Configure bridge interface
+  template:
+    src: bridge.network.j2
+    dest: /etc/systemd/network/{{ bridge_interface }}.network
+    mode: '0644'
+  become: true
+  notify: restart systemd-networkd
+
+# Start the network services
+- name: Enable and start systemd-networkd
+  service:
+    name: systemd-networkd
+    state: started
+    enabled: true
+  become: true
+  register: networkd_service
+  ignore_errors: "{{ ansible_check_mode }}"
+

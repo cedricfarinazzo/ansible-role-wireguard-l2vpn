@@ -1,0 +1,30 @@
+---
+galaxy_info:
+  role_name: wireguard_l2vpn
+  namespace: sedinfra
+  author: cedricfarinazzo
+  description: An Ansible Role that sets up a full mesh Wireguard network with L2VPN capabilities
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: EL  # Enterprise Linux (RHEL, CentOS, etc.)
+      versions:
+        - 8
+        - 9
+  galaxy_tags:
+    - wireguard
+    - vpn
+    - l2vpn
+    - networking
+    - vxlan
+    - bridge
+
+dependencies: []
