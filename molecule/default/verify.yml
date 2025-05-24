@@ -5,7 +5,8 @@
   vars:
     wireguard_interface: wg0
     vxlan_interface: vxlan0
-    bridge_interface: br0
+    bridge_interface: br10
+    bridge_address_prefix: 172.20.0
     
   tasks:
     - name: Check virtualization type
