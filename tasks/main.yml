@@ -23,10 +23,26 @@
     name: "{{ item }}"
     state: present
   with_items:
-    - bridge-utils
     - iproute2
   become: true
   ignore_errors: "{{ ansible_check_mode }}"
+
+# Enable IP forwarding for L2VPN functionality
+- name: Enable IPv4 forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+  become: true
+
+- name: Enable IPv6 forwarding
+  sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: '1'
+    state: present
+    reload: yes
+  become: true
 
 # Ensure Wireguard directory exists
 - name: Create Wireguard directory
@@ -91,48 +107,3 @@
   become: true
   register: wireguard_service
   ignore_errors: "{{ ansible_check_mode }}"
-
-# Configure VXLAN interface
-- name: Create VXLAN interface
-  template:
-    src: vxlan.netdev.j2
-    dest: /etc/systemd/network/{{ vxlan_interface }}.netdev
-    mode: '0644'
-  become: true
-  notify: restart systemd-networkd
-
-- name: Configure VXLAN interface
-  template:
-    src: vxlan.network.j2
-    dest: /etc/systemd/network/{{ vxlan_interface }}.network
-    mode: '0644'
-  become: true
-  notify: restart systemd-networkd
-
-# Configure bridge interface
-- name: Create bridge interface
-  template:
-    src: bridge.netdev.j2
-    dest: /etc/systemd/network/{{ bridge_interface }}.netdev
-    mode: '0644'
-  become: true
-  notify: restart systemd-networkd
-
-- name: Configure bridge interface
-  template:
-    src: bridge.network.j2
-    dest: /etc/systemd/network/{{ bridge_interface }}.network
-    mode: '0644'
-  become: true
-  notify: restart systemd-networkd
-
-# Start the network services
-- name: Enable and start systemd-networkd
-  service:
-    name: systemd-networkd
-    state: started
-    enabled: true
-  become: true
-  register: networkd_service
-  ignore_errors: "{{ ansible_check_mode }}"
-

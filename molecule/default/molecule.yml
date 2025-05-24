@@ -61,6 +61,7 @@ provisioner:
       wireguard_nodes:
         wireguard_address_prefix: "10.8.0"
         bridge_address_prefix: "172.20.0"
+        bridge_interface: br10
 verifier:
   name: ansible
 lint: |

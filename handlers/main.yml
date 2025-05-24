@@ -4,9 +4,3 @@
     name: wg-quick@{{ wireguard_interface }}
     state: restarted
   become: true
-
-- name: restart systemd-networkd
-  service:
-    name: systemd-networkd
-    state: restarted
-  become: true

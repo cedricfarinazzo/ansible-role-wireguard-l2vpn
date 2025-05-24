@@ -4,7 +4,7 @@ An Ansible Role that sets up a full mesh Wireguard network between all hosts, co
 
 ## Requirements
 
-- Linux hosts with systemd-networkd
+- Linux hosts with WireGuard support
 - Python for Ansible
 - Internet connectivity to install packages
 
@@ -104,8 +104,8 @@ This role configures a network with the following components:
 ## How It Works
 
 1. **Wireguard Setup**: Each host generates a private/public key pair and creates a Wireguard interface with connections to all other hosts.
-2. **VXLAN Layer**: A VXLAN interface is created to encapsulate L2 traffic across the Wireguard network, using multicast address 239.1.1.42.
-3. **Bridge Configuration**: A bridge interface is set up with a static IP from the 172.16.0.0/24 range.
+2. **VXLAN Layer**: A VXLAN interface is created using PostUp commands to encapsulate L2 traffic across the Wireguard network, using multicast address 239.1.1.42.
+3. **Bridge Configuration**: A bridge interface is set up with a static IP from the 172.16.0.0/24 range using native Linux networking commands.
 
 ## Security Notes
 
@@ -217,7 +217,7 @@ If nodes can't communicate over the L2VPN:
 3. Verify bridge configuration:
    ```bash
    # List bridge interfaces
-   brctl show
+   ip link show type bridge
    
    # Check bridge forwarding
    bridge fdb show
