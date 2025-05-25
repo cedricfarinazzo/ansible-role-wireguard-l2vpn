@@ -90,6 +90,11 @@ wireguard_client_only_peers: []       # List of peer hostnames to exclude endpoi
 - Use `wireguard_client_only_peers` to specify which peer endpoints should be excluded from this node's config
 - Hosts behind NAT or without internet access should be added to client-only peers list
 
+**PersistentKeepalive Behavior:**
+- `PersistentKeepalive` is automatically enabled only when this host is acting as a client to a peer
+- This happens when the current host is listed in the peer's `wireguard_client_only_peers` list
+- Optimizes traffic by avoiding unnecessary keepalives in server-to-server connections
+
 ## 🏗️ Network Architecture
 
 ### Network Stack Components
@@ -172,17 +177,23 @@ For hosts that are not accessible from the internet (e.g., behind NAT without po
   roles:
     - role: cedricfarinazzo.wireguard_l2vpn
 
-# Then in host_vars for each internal node:
-# host_vars/server1.yml
+# Configuration on the server side:
+# host_vars/server1.yml (publicly accessible server)
+wireguard_client_only_peers:
+  - internal_node1
+  - internal_node2
+
+# host_vars/server2.yml (another publicly accessible server)
 wireguard_client_only_peers:
   - internal_node1
   - internal_node2
 ```
 This configuration means:
-- `server1` **will NOT** have `Endpoint` lines for `internal_node1` and `internal_node2` in its WireGuard config
-- `server1` **will** still have `Endpoint` lines for other peers
-- `internal_node1` and `internal_node2` can still initiate connections to `node3` if they have `node3`'s endpoint
-- This is useful when `internal_node1` and `internal_node2` are behind NAT/firewall but `server1` is publicly accessible
+- `server1` and `server2` **will NOT** have `Endpoint` lines for `internal_node1` and `internal_node2`
+- `internal_node1` and `internal_node2` **will** have `Endpoint` lines for `server1` and `server2`
+- `internal_node1` and `internal_node2` **will** have `PersistentKeepalive` enabled for `server1` and `server2`
+- `server1` and `server2` will **NOT** have `PersistentKeepalive` between each other (server-to-server)
+- This optimizes NAT traversal while avoiding unnecessary keepalives
 
 ## 🔒 Security Considerations
 

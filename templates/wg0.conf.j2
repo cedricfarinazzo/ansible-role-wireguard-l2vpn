@@ -35,7 +35,10 @@ AllowedIPs = {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(h
 {% if host not in client_only_peers %}
 Endpoint = {{ hostvars[host]['ansible_default_ipv4']['address'] }}:{{ wireguard_port }}
 {% endif %}
+{% set peer_client_only_peers = hostvars[host]['wireguard_client_only_peers'] | default([]) %}
+{% if inventory_hostname in peer_client_only_peers %}
 PersistentKeepalive = {{ wireguard_persistent_keepalive }}
+{% endif %}
 {% endif %}
 {% endfor %}
 {% endif %}
