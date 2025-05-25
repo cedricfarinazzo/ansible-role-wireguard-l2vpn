@@ -55,7 +55,10 @@ platforms:
 provisioner:
   name: ansible
   playbooks:
+    prepare: prepare/playbook.yml
     converge: converge/playbook.yml
+    side_effect: side_effect/playbook.yml
+    verify: verify/playbook.yml
   inventory:
     group_vars:
       wireguard_nodes:
@@ -93,7 +96,11 @@ scenario:
   test_sequence:
     - create
     - prepare
-    - converge
+    - converge # install the role
+    - verify
     - idempotence
+    - verify
+    - side_effect # run side effect playbook to trigger key rotation
+    - converge # Rotate keys
     - verify
     - destroy

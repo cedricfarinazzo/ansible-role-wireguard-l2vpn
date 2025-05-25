@@ -9,7 +9,7 @@
     # Use the same configuration as in molecule.yml group_vars
     wireguard_address_prefix: "10.8.0"
     bridge_address_prefix: "172.20.0"
-
+    wireguard_key_rotation_days: 30  # Key rotation threshold in days
   tasks:
     - name: Check virtualization type
       ansible.builtin.debug:
@@ -48,6 +48,49 @@
     - name: Display Bridge interface info
       ansible.builtin.debug:
         msg: "{{ bridge_interface_result.stdout_lines | default(['Not found']) }}"
+
+    # Key rotation verification
+    - name: Check if backups directory exists (indicates key rotation occurred)
+      ansible.builtin.stat:
+        path: /etc/wireguard/backups
+      register: backups_dir_check
+
+    - name: List backup files if they exist
+      ansible.builtin.find:
+        paths: /etc/wireguard/backups
+        patterns: "privatekey_*"
+      register: backup_files
+      when: backups_dir_check.stat.exists
+
+    - name: Display key rotation evidence
+      ansible.builtin.debug:
+        msg: >-
+          Key rotation evidence for {{ inventory_hostname }}:
+          Backups directory exists: {{ backups_dir_check.stat.exists }}
+          {% if backup_files is defined and backup_files.files %}
+          Backup files found: {{ backup_files.files | length }}
+          {% endif %}
+
+    - name: Check current private key age
+      ansible.builtin.stat:
+        path: /etc/wireguard/privatekey
+      register: current_key_stat
+
+    - name: Display current key age
+      ansible.builtin.debug:
+        msg: >-
+          Current private key age: 
+          {{ ((ansible_date_time.epoch | int) - (current_key_stat.stat.mtime | default(0))) // 86400 }} days old
+      when: current_key_stat.stat.exists
+
+    # failed if current key is older than rotation threshold
+    - name: Fail if current key is older than rotation threshold
+      ansible.builtin.fail:
+        msg: >-
+          Current private key is too old ({{ ((ansible_date_time.epoch | int) - (current_key_stat.stat.mtime | default(0))) // 86400 }} days old).
+          Key rotation may have failed.
+      when: current_key_stat.stat.exists and
+            ((ansible_date_time.epoch | int) - (current_key_stat.stat.mtime | default(0))) // 86400 >= wireguard_key_rotation_days | int
 
     # Get WireGuard IP addresses for all nodes
     - name: Get WireGuard IP for current node

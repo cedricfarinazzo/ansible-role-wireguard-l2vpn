@@ -1,0 +1,29 @@
+---
+# Side effect playbook to test key rotation by modifying private key timestamps
+- name: Trigger key rotation by aging private keys
+  hosts: wireguard_nodes
+  become: true
+  tasks:
+    - name: Check if private key exists
+      ansible.builtin.stat:
+        path: /etc/wireguard/privatekey
+      register: private_key_check
+
+    - name: Age private key file to trigger rotation (set mtime to 31 days ago)
+      ansible.builtin.shell: |
+        # Set the modification time to 31 days ago to trigger rotation
+        touch -d "31 days ago" /etc/wireguard/privatekey
+      when: private_key_check.stat.exists
+      
+    - name: Display private key file info after aging
+      ansible.builtin.stat:
+        path: /etc/wireguard/privatekey
+      register: aged_key_stat
+      when: private_key_check.stat.exists
+      
+    - name: Log aged key timestamp
+      ansible.builtin.debug:
+        msg: >-
+          Private key aged: {{ aged_key_stat.stat.mtime | default('N/A') }}
+          ({{ ((ansible_date_time.epoch | int) - (aged_key_stat.stat.mtime | default(0))) // 86400 }} days old)
+      when: private_key_check.stat.exists
