@@ -31,7 +31,10 @@ PostDown = ip link del {{ bridge_interface }} || true
 # {{ host }}
 PublicKey = {{ hostvars[host]['wireguard_public_key'] }}
 AllowedIPs = {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(host) + 10 }}/32
-Endpoint = {{ hostvars[host]['ansible_default_ipv4']['address'] | default('127.0.0.1') }}:{{ wireguard_port }}
+{% set client_only_peers = wireguard_client_only_peers | default([]) %}
+{% if host not in client_only_peers %}
+Endpoint = {{ hostvars[host]['ansible_default_ipv4']['address'] }}:{{ wireguard_port }}
+{% endif %}
 PersistentKeepalive = {{ wireguard_persistent_keepalive }}
 {% endif %}
 {% endfor %}

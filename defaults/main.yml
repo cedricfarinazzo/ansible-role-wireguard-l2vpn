@@ -12,6 +12,11 @@ wireguard_address_prefix: "10.10.10"
 wireguard_netmask: 24
 wireguard_persistent_keepalive: 25
 
+# Advanced endpoint configuration
+# List of hosts for which this node should NOT specify endpoints
+# Useful when this node is client-only to certain peers
+wireguard_client_only_peers: []
+
 # VXLAN configuration
 vxlan_interface: vxlan0
 vxlan_id: 42

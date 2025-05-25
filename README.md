@@ -79,6 +79,17 @@ bridge_netmask: 24                    # Bridge subnet mask
 bridge_address_offset: "{{ inventory_hostname | ansible.utils.hash('sha1') | regex_replace('[^0-9]','') | truncate(2, True, '') | int + 10 }}"
 ```
 
+#### Endpoint Configuration
+```yaml
+# Advanced per-host client-only control (set in host_vars)
+wireguard_client_only_peers: []       # List of peer hostnames to exclude endpoints for
+```
+
+**Endpoint Behavior:**
+- By default, endpoints are included for all peers with valid IP addresses
+- Use `wireguard_client_only_peers` to specify which peer endpoints should be excluded from this node's config
+- Hosts behind NAT or without internet access should be added to client-only peers list
+
 ## 🏗️ Network Architecture
 
 ### Network Stack Components
@@ -152,6 +163,26 @@ This role has **zero external dependencies** and uses only:
       vars:
         bridge_address_prefix: "192.168.100"
 ```
+
+### Client-Only Node Configuration
+For hosts that are not accessible from the internet (e.g., behind NAT without port forwarding):
+```yaml
+- hosts: wireguard_nodes
+  become: true
+  roles:
+    - role: cedricfarinazzo.wireguard_l2vpn
+
+# Then in host_vars for each internal node:
+# host_vars/server1.yml
+wireguard_client_only_peers:
+  - internal_node1
+  - internal_node2
+```
+This configuration means:
+- `server1` **will NOT** have `Endpoint` lines for `internal_node1` and `internal_node2` in its WireGuard config
+- `server1` **will** still have `Endpoint` lines for other peers
+- `internal_node1` and `internal_node2` can still initiate connections to `node3` if they have `node3`'s endpoint
+- This is useful when `internal_node1` and `internal_node2` are behind NAT/firewall but `server1` is publicly accessible
 
 ## 🔒 Security Considerations
 
