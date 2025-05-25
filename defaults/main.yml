@@ -22,4 +22,3 @@ bridge_interface: br0
 bridge_address_prefix: "172.16.0"
 bridge_netmask: 24
 bridge_address_offset: "{{ groups['wireguard_nodes'].index(inventory_hostname) + 11 }}"
-

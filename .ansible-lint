@@ -1,0 +1,11 @@
+---
+exclude_paths:
+  - .venv/
+  - .ansible/
+
+skip_list:
+  - role-name[path]
+  - risky-shell-pipe
+
+use_default_rules: true
+parseable: true

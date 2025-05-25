@@ -1,7 +1,7 @@
 ---
 # Include tasks based on the operating system family
 - name: Include OS-specific variables
-  include_vars: "{{ item }}"
+  ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - "{{ ansible_os_family }}.yml"
     - "{{ ansible_distribution }}.yml"
@@ -11,15 +11,15 @@
 
 # Install required packages
 - name: Install required packages
-  package:
+  ansible.builtin.package:
     name: "{{ wireguard_package }}"
     state: "{{ wireguard_package_state }}"
   become: true
-  notify: restart wireguard
+  notify: Restart wireguard
   ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Install network tools
-  package:
+  ansible.builtin.package:
     name: "{{ item }}"
     state: present
   with_items:
@@ -29,7 +29,7 @@
 
 # Enable IP forwarding for L2VPN functionality
 - name: Enable IPv4 forwarding
-  sysctl:
+  ansible.posix.sysctl:
     name: net.ipv4.ip_forward
     value: '1'
     state: present
@@ -37,7 +37,7 @@
   become: true
 
 - name: Enable IPv6 forwarding
-  sysctl:
+  ansible.posix.sysctl:
     name: net.ipv6.conf.all.forwarding
     value: '1'
     state: present
@@ -46,7 +46,7 @@
 
 # Ensure Wireguard directory exists
 - name: Create Wireguard directory
-  file:
+  ansible.builtin.file:
     path: /etc/wireguard
     state: directory
     mode: '0700'
@@ -54,34 +54,35 @@
 
 # Generate wireguard keys
 - name: Generate Wireguard private key
-  shell: wg genkey > /etc/wireguard/privatekey && chmod 600 /etc/wireguard/privatekey
+  ansible.builtin.shell: wg genkey > /etc/wireguard/privatekey && chmod 600 /etc/wireguard/privatekey
   args:
     creates: /etc/wireguard/privatekey
   become: true
 
 - name: Read Wireguard private key
-  slurp:
+  ansible.builtin.slurp:
     src: /etc/wireguard/privatekey
   register: wireguard_private_key_encoded
   become: true
 
 - name: Set Wireguard private key fact
-  set_fact:
+  ansible.builtin.set_fact:
     wireguard_private_key: "{{ wireguard_private_key_encoded['content'] | b64decode | trim }}"
   when: wireguard_private_key_encoded is defined
 
 - name: Generate Wireguard public key from private key
-  shell: echo "{{ wireguard_private_key }}" | wg pubkey
+  ansible.builtin.shell: |
+    echo "{{ wireguard_private_key }}" | wg pubkey
   register: wireguard_public_key_result
   changed_when: false
 
 - name: Set Wireguard public key fact
-  set_fact:
+  ansible.builtin.set_fact:
     wireguard_public_key: "{{ wireguard_public_key_result.stdout }}"
 
 # Exchange public keys (this is typically done via a host/group var file in a real-world scenario)
 - name: Gather facts from all hosts for key exchange
-  setup:
+  ansible.builtin.setup:
   delegate_to: "{{ item }}"
   delegate_facts: true
   with_items: "{{ groups['all'] }}"
@@ -91,16 +92,16 @@
 
 # Configure Wireguard full mesh
 - name: Generate wireguard configuration file
-  template:
+  ansible.builtin.template:
     src: wg0.conf.j2
     dest: /etc/wireguard/{{ wireguard_interface }}.conf
     mode: '0600'
   become: true
-  notify: restart wireguard
+  notify: Restart wireguard
 
 # Enable and start wireguard service
 - name: Enable and start Wireguard
-  service:
+  ansible.builtin.service:
     name: wg-quick@{{ wireguard_interface }}
     state: "{{ wireguard_service_state }}"
     enabled: "{{ wireguard_service_enabled }}"
