@@ -1,265 +1,188 @@
-# Ansible Role: Wireguard L2VPN
+# 🌐 Ansible Role: WireGuard L2VPN
 
-An Ansible Role that sets up a full mesh Wireguard network between all hosts, configures a VXLAN interface over the Wireguard network, and creates a bridge interface with a static IP.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Ansible Galaxy](https://img.shields.io/badge/Ansible%20Galaxy-cedricfarinazzo.wireguard__l2vpn-blue)](https://galaxy.ansible.com/cedricfarinazzo/wireguard_l2vpn)
 
-## Requirements
+> **An advanced Ansible role that creates a Layer 2 VPN using WireGuard mesh networking, VXLAN encapsulation, and Linux bridge interfaces.**
 
-- Linux hosts with WireGuard support
-- Python for Ansible
-- Internet connectivity to install packages
+This role establishes a secure, scalable Layer 2 network overlay that allows distributed hosts to communicate as if they were on the same LAN segment, regardless of their physical network location.
 
-## Role Variables
-
-Available variables are listed below, along with default values (see `defaults/main.yml`):
+## 🚀 Quick Start
 
 ```yaml
-# Wireguard package and service settings
-wireguard_package: wireguard
-wireguard_package_state: present
-wireguard_service_state: started
-wireguard_service_enabled: true
+# Simple inventory setup
+- hosts: wireguard_nodes
+  roles:
+    - cedricfarinazzo.wireguard_l2vpn
+```
 
-# Wireguard network configuration
-wireguard_port: 51820
-wireguard_interface: wg0
-wireguard_address_prefix: "10.10.10"
-wireguard_netmask: 24
+**Important**: All hosts must be in the `wireguard_nodes` inventory group for the full mesh topology to work correctly.
 
-# VXLAN configuration
-vxlan_interface: vxlan0
-vxlan_id: 42
-vxlan_port: 4789
-vxlan_multicast_group: "239.1.1.42"
+That's it! The role will automatically:
+- ✅ Generate WireGuard keys for each host
+- ✅ Create a full mesh VPN topology
+- ✅ Configure VXLAN for Layer 2 connectivity  
+- ✅ Set up bridge interfaces with static IPs
+- ✅ Enable secure communication between all nodes
 
-# Bridge configuration
-bridge_interface: br0
-bridge_address_prefix: "172.16.0"
-bridge_netmask: 24
+## 📋 Requirements
+
+| Component | Requirement |
+|-----------|-------------|
+| **Operating System** | Linux with WireGuard kernel support |
+| **Ansible** | Version 2.9+ |
+| **Python** | Python 3.8+ on target hosts |
+| **Network** | Internet connectivity for package installation |
+| **Privileges** | Root or sudo access on target hosts |
+
+### Supported Distributions
+
+- ✅ **Debian** 11, 12
+- ✅ **Ubuntu** 20.04, 22.04, 24.04
+
+## ⚙️ Configuration
+
+### Core Variables
+
+The role uses sensible defaults but can be customized through these variables:
+
+#### WireGuard Configuration
+```yaml
+# Package and service management
+wireguard_package: wireguard           # Package name
+wireguard_package_state: present       # Package state
+wireguard_service_state: started       # Service state
+wireguard_service_enabled: true        # Enable on boot
+
+# Network settings
+wireguard_port: 51820                  # UDP port for WireGuard
+wireguard_interface: wg0               # Interface name
+wireguard_address_prefix: "10.10.10"   # IP prefix for mesh network
+wireguard_netmask: 24                  # Subnet mask
+wireguard_persistent_keepalive: 25     # NAT traversal
+
+```
+
+#### VXLAN Configuration
+```yaml
+vxlan_interface: vxlan0                # VXLAN interface name
+vxlan_id: 42                          # VXLAN Network Identifier (VNI)
+vxlan_port: 4789                      # VXLAN UDP port
+vxlan_multicast_group: "239.1.1.42"   # Multicast group for VXLAN
+```
+
+#### Bridge Configuration
+```yaml
+bridge_interface: br0                  # Bridge interface name
+bridge_address_prefix: "172.16.0"     # IP prefix for bridge network
+bridge_netmask: 24                    # Bridge subnet mask
 bridge_address_offset: "{{ inventory_hostname | ansible.utils.hash('sha1') | regex_replace('[^0-9]','') | truncate(2, True, '') | int + 10 }}"
 ```
 
-## Dependencies
+## 🏗️ Network Architecture
 
-None.
+### Network Stack Components
 
-## Example Playbook
+| Layer | Component | Purpose | Configuration |
+|-------|-----------|---------|---------------|
+| **L2 Bridge** | `br0` | Provides Layer 2 switching | Static IPs: `172.16.0.x/24` |
+| **VXLAN** | `vxlan0` | L2 over L3 encapsulation | VNI: 42, Multicast: `239.1.1.42` |
+| **VPN** | `wg0` | Secure mesh networking | Full mesh topology: `10.10.10.x/24` |
+| **Physical** | `eth0` | Internet connectivity | DHCP/Static (existing) |
 
+### Multi-Node Topology
+
+```
+    ┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+    │       Node A        │     │       Node B        │     │       Node C        │
+    │                     │     │                     │     │                     │
+    │  ┏━━━━━━━━━━━━━━━┓   │     │  ┏━━━━━━━━━━━━━━━┓   │     │  ┏━━━━━━━━━━━━━━━┓   │
+    │  ┃ br0           ┃   │     │  ┃ br0           ┃   │     │  ┃ br0           ┃   │
+    │  ┃ 172.16.0.11   ┃   │     │  ┃ 172.16.0.12   ┃   │     │  ┃ 172.16.0.13   ┃   │
+    │  ┗━━━━━━┯━━━━━━━━┛   │     │  ┗━━━━━━┯━━━━━━━━┛   │     │  ┗━━━━━━┯━━━━━━━━┛   │
+    │         │            │     │         │            │     │         │            │
+    │  ┌──────┴──────┐     │     │  ┌──────┴──────┐     │     │  ┌──────┴──────┐     │
+    │  │ vxlan0      │     │     │  │ vxlan0      │     │     │  │ vxlan0      │     │
+    │  │ VNI: 42     │     │     │  │ VNI: 42     │     │     │  │ VNI: 42     │     │
+    │  └──────┬──────┘     │     │  └──────┬──────┘     │     │  └──────┬──────┘     │
+    │         │            │     │         │            │     │         │            │
+    │  ┌──────┴──────┐     │     │  ┌──────┴──────┐     │     │  ┌──────┴──────┐     │
+    │  │ wg0         │     │     │  │ wg0         │     │     │  │ wg0         │     │
+    │  │ 10.10.10.1  │     │     │  │ 10.10.10.2  │     │     │  │ 10.10.10.3  │     │
+    │  └──────┬──────┘     │     │  └──────┬──────┘     │     │  └──────┬──────┘     │
+    └─────────┼────────────┘     └─────────┼────────────┘     └─────────┼────────────┘
+              │                            │                            │
+              └────────────┬───────────────┴─────────────┬──────────────┘
+                           │                             │
+                    ┌──────┴──────┐               ┌──────┴──────┐
+                    │   Internet   │               │   Internet   │
+                    │  (Encrypted  │               │ (Encrypted   │
+                    │   Tunnels)   │               │  Tunnels)    │
+                    └─────────────┘               └─────────────┘
+```
+
+### Traffic Flow
+
+1. **Application Traffic** → Bridge interface (`br0`)
+2. **L2 Frames** → VXLAN encapsulation (`vxlan0`)  
+3. **VXLAN Packets** → WireGuard encryption (`wg0`)
+4. **Encrypted Packets** → Internet routing
+
+## 🔧 How It Works
+
+1. **WireGuard Setup**: Automatic key generation and full mesh VPN configuration
+2. **VXLAN Layer**: Creates Layer 2 overlay network using multicast learning
+3. **Bridge Integration**: Linux bridge provides local L2 switching with static IPs
+
+## 📦 Dependencies
+
+This role has **zero external dependencies** and uses only:
+- ✅ **Ansible Core Modules** (built-in)
+- ✅ **Linux Kernel Features** (WireGuard, VXLAN, Bridges)
+- ✅ **Standard Packages** (available in all major distributions)
+
+## 🎯 Usage Examples
+
+### Basic Multi-Site Setup
 ```yaml
-- hosts: servers
+- hosts: wireguard_nodes
+  become: true
   roles:
-    - wireguard-l2vpn
+    - role: cedricfarinazzo.wireguard_l2vpn
+      vars:
+        bridge_address_prefix: "192.168.100"
 ```
 
-## Network Architecture
+## 🔒 Security Considerations
 
-This role configures a network with the following components:
+### Key Management
+- **Automatic Generation**: WireGuard keys are automatically generated if not provided
+- **Key Rotation**: Implement regular key rotation procedures (TODO)
 
-1. A full mesh Wireguard VPN between all hosts in the inventory
-2. A VXLAN interface (vxlan0) running on top of the Wireguard interface (wg0)
-3. A bridge interface (br0) that includes the VXLAN interface
-4. Static IP addressing on the bridge interface
+### Network Security
+- **Encryption**: All traffic encrypted with ChaCha20Poly1305
+- **Authentication**: Cryptographic authentication prevents man-in-the-middle attacks
+- **Perfect Forward Secrecy**: Regular key rotation provides perfect forward secrecy
+- **IP Allowlists**: Configure restrictive allowed IPs for each peer
 
-### Network Diagram
 
-```
-                    Node 1                                   Node 2
-┌───────────────────────────────────┐    ┌───────────────────────────────────┐
-│                                   │    │                                   │
-│  ┌────────────┐                   │    │  ┌────────────┐                   │
-│  │ br0        │ 172.16.0.11/24    │    │  │ br0        │ 172.16.0.12/24    │
-│  └─────┬──────┘                   │    │  └─────┬──────┘                   │
-│        │                          │    │        │                          │
-│  ┌─────┴──────┐                   │    │  ┌─────┴──────┐                   │
-│  │ vxlan0     │ Multicast: 239.1.1.42   │  │ vxlan0     │ VNI: 42          │
-│  └─────┬──────┘                   │    │  └─────┬──────┘                   │
-│        │                          │    │        │                          │
-│  ┌─────┴──────┐                   │    │  ┌─────┴──────┐                   │
-│  │ wg0        │ 10.10.10.1/24     │    │  │ wg0        │ 10.10.10.2/24     │
-│  └─────┬──────┘                   │    │  └─────┬──────┘                   │
-└────────┼──────────────────────────┘    └────────┼──────────────────────────┘
-         │                                        │
-         │                                        │
-         └───────────────WireGuard───────────────┐│
-                         Full Mesh                │
-         ┌────────────────────────────────────────┘
-         │
-┌────────┼──────────────────────────┐
-│        │                          │
-│  ┌─────┴──────┐                   │
-│  │ wg0        │ 10.10.10.3/24     │
-│  └─────┬──────┘                   │
-│        │                          │
-│  ┌─────┴──────┐                   │
-│  │ vxlan0     │ VXLAN Port: 4789  │
-│  └─────┬──────┘                   │
-│        │                          │
-│  ┌─────┴──────┐                   │
-│  │ br0        │ 172.16.0.13/24    │
-│  └────────────┘                   │
-│                                   │
-└───────────────────────────────────┘
-           Node 3
-```
+## 🧪 Testing
 
-## How It Works
-
-1. **Wireguard Setup**: Each host generates a private/public key pair and creates a Wireguard interface with connections to all other hosts.
-2. **VXLAN Layer**: A VXLAN interface is created using PostUp commands to encapsulate L2 traffic across the Wireguard network, using multicast address 239.1.1.42.
-3. **Bridge Configuration**: A bridge interface is set up with a static IP from the 172.16.0.0/24 range using native Linux networking commands.
-
-## Security Notes
-
-- For production use, you should manage Wireguard keys securely through your Ansible vault or other secret management system.
-- The role automatically generates Wireguard keys if they are not provided.
-
-## Testing
-
-This role includes Molecule tests to validate functionality in a multi-node cluster setup. To run the tests:
-
-1. Make sure you have Docker installed and running with appropriate privileges
-2. Run the test script:
-
+### Quick Testing
 ```bash
-./run-tests.sh
+# Run test against debian12
+make test
+
+# Test against all supported distributions
+make molecule-test-all
 ```
 
-By default, the tests use Debian 11. You can specify a different distribution:
+### Test Coverage
+- Package installation and service configuration
+- Full mesh connectivity between all nodes
+- VXLAN and bridge interface validation
 
-```bash
-./run-tests.sh ubuntu2004  # Test with Ubuntu 20.04
-```
+## 👥 Authors & Contributors
 
-### Test Environment
+**Cédric Farinazzo** ([@cedricfarinazzo](https://github.com/cedricfarinazzo)) - *Author and Maintainer*
 
-The testing environment:
-- Creates three Docker containers with the specified distribution
-- Configures a full mesh Wireguard network between the containers
-- Sets up VXLAN and bridge interfaces on each container
-- Verifies connectivity between the nodes
-- Tests the L2VPN functionality by checking ping connectivity
-
-### Test Requirements
-
-- Docker with elevated privileges (for network operations)
-- Python 3 with virtual environment support
-- Internet connectivity to download Docker images and packages
-```
-
-The advanced validation tests perform the following checks:
-- Interface existence and status verification
-- Full connectivity testing between all nodes
-- Bandwidth testing using iperf3
-- File transfer testing over the L2VPN
-- MTU verification across all interfaces
-- Multicast communication testing
-
-You can also run these tests using the Makefile:
-
-```bash
-make advanced-test
-```
-
-### Test Environment
-
-The testing environment:
-- Creates a Docker container with the specified distribution
-- Installs Wireguard and related packages
-- Configures all required interfaces and services
-- Verifies the setup is working correctly
-
-### Test Requirements
-
-- Docker with elevated privileges (for network operations)
-- Python 3 with virtual environment support
-- Internet connectivity to download Docker images and packages
-
-## Troubleshooting
-
-### Common Issues
-
-#### Wireguard Interface Not Coming Up
-
-If the Wireguard interface isn't coming up, check:
-
-```bash
-# Check if Wireguard kernel module is loaded
-lsmod | grep wireguard
-
-# Check Wireguard interface status
-ip link show wg0
-
-# Check Wireguard logs
-journalctl -u wg-quick@wg0
-```
-
-#### No Connectivity Between Nodes
-
-If nodes can't communicate over the L2VPN:
-
-1. Verify Wireguard connectivity:
-   ```bash
-   # Check Wireguard peers
-   wg show
-
-   # Check if Wireguard traffic is flowing
-   tcpdump -i wg0
-   ```
-
-2. Verify VXLAN configuration:
-   ```bash
-   # Check VXLAN interface
-   ip -d link show vxlan0
-   
-   # Check multicast routing
-   ip mroute show
-   ```
-
-3. Verify bridge configuration:
-   ```bash
-   # List bridge interfaces
-   ip link show type bridge
-   
-   # Check bridge forwarding
-   bridge fdb show
-   ```
-
-#### MTU Issues
-
-If you're experiencing packet fragmentation or connectivity problems:
-
-```bash
-# Check MTU on all relevant interfaces
-ip link show | grep mtu
-
-# Set appropriate MTU values (adjust as needed)
-ip link set dev wg0 mtu 1420
-ip link set dev vxlan0 mtu 1400
-ip link set dev br0 mtu 1400
-```
-
-Consider that the MTU for each interface should be set with overhead in mind:
-- Wireguard overhead: ~60 bytes
-- VXLAN overhead: ~50 bytes
-
-#### Firewall Issues
-
-Ensure your firewall allows:
-- UDP port 51820 (or your configured Wireguard port)
-- UDP port 4789 (VXLAN)
-- Protocol 112 (VRRP) if using VRRP
-- Multicast traffic (239.1.1.42)
-
-```bash
-# For iptables-based firewalls
-iptables -A INPUT -p udp --dport 51820 -j ACCEPT
-iptables -A INPUT -p udp --dport 4789 -j ACCEPT
-iptables -A INPUT -d 239.1.1.42/32 -j ACCEPT
-```
-
-## License
-
-MIT
-
-## Author Information
-
-This role was created by SEDINFRA team.
