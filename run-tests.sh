@@ -9,7 +9,7 @@ function show_usage() {
     echo
     echo "Arguments:"
     echo "  DISTRO    Distribution to test with (default: debian11)"
-    echo "            Supported: debian11, debian10, ubuntu2004, centos8"
+    echo "            Supported: debian11, debian12, ubuntu2004, ubuntu2404"
     echo
     echo "Examples:"
     echo "  $0              # Test with Debian 11"

@@ -1,5 +1,5 @@
 # Define supported distributions
-SUPPORTED_DISTROS := debian11 debian10 ubuntu2004 centos8
+SUPPORTED_DISTROS := debian11 debian12 ubuntu2004 ubuntu2404
 DEFAULT_DISTRO := debian11
 
 .PHONY: molecule-test molecule-test-all lint help check-prereqs $(addprefix molecule-test-,$(SUPPORTED_DISTROS)) test

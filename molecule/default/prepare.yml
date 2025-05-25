@@ -5,30 +5,19 @@
   gather_facts: true
 
   tasks:
-    - name: Update apt cache (Debian)
-      apt:
+    - name: Update package cache (Debian/Ubuntu)
+      ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600
       when: ansible_os_family == 'Debian'
-      ignore_errors: true
+      failed_when: false
 
-    - name: Install iputils-ping (Debian)
-      apt:
-        name: iputils-ping
+    - name: Install network utilities (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - iputils-ping
+          - iputils-arping
+          - tcpdump
         state: present
       when: ansible_os_family == 'Debian'
-      ignore_errors: true
-
-    - name: Install iputils-arping (Debian)
-      apt:
-        name: iputils-arping
-        state: present
-      when: ansible_os_family == 'Debian'
-      ignore_errors: true
-
-    - name: Install tcpdump (Debian)
-      apt:
-        name: tcpdump
-        state: present
-      when: ansible_os_family == 'Debian'
-      ignore_errors: true
+      failed_when: false

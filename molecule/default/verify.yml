@@ -6,70 +6,118 @@
     wireguard_interface: wg0
     vxlan_interface: vxlan0
     bridge_interface: br10
-    bridge_address_prefix: 172.20.0
-    
+    # Use the same configuration as in molecule.yml group_vars
+    wireguard_address_prefix: "10.8.0"
+    bridge_address_prefix: "172.20.0"
+
   tasks:
     - name: Check virtualization type
-      debug:
+      ansible.builtin.debug:
         msg: "Running in {{ ansible_virtualization_type }} environment"
 
     - name: Check if Wireguard interface exists
-      command: ip link show {{ wireguard_interface }}
+      ansible.builtin.command: ip link show {{ wireguard_interface }}
       register: wg_interface_result
       changed_when: false
       failed_when: false
-      
+
     - name: Display Wireguard interface info
-      debug:
+      ansible.builtin.debug:
         msg: "{{ wg_interface_result.stdout_lines | default(['Not found']) }}"
-      
+
     - name: Skip service check in Docker environment
-      set_fact:
+      ansible.builtin.set_fact:
         skip_service_check: "{{ ansible_virtualization_type in ['docker', 'container', 'containerd'] }}"
-        
+
     - name: Check if VXLAN interface exists
-      command: ip link show {{ vxlan_interface }}
+      ansible.builtin.command: ip link show {{ vxlan_interface }}
       register: vxlan_interface_result
       changed_when: false
       failed_when: false
-      
+
     - name: Display VXLAN interface info
-      debug:
+      ansible.builtin.debug:
         msg: "{{ vxlan_interface_result.stdout_lines | default(['Not found']) }}"
-      
+
     - name: Check if Bridge interface exists
-      command: ip link show {{ bridge_interface }}
+      ansible.builtin.command: ip link show {{ bridge_interface }}
       register: bridge_interface_result
       changed_when: false
       failed_when: false
-      
+
     - name: Display Bridge interface info
-      debug:
+      ansible.builtin.debug:
         msg: "{{ bridge_interface_result.stdout_lines | default(['Not found']) }}"
-      
-    # Test connectivity between nodes
-    - name: Test connectivity to other nodes
-      shell: |
-        ip a show dev {{ bridge_interface }} | grep -q "inet " && ping -c 1 -W 5 {{ bridge_address_prefix }}.{{ item }}
-      register: ping_result
-      failed_when: false
+
+    # Get WireGuard IP addresses for all nodes
+    - name: Get WireGuard IP for current node
+      ansible.builtin.set_fact:
+        current_wg_ip: "{{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(inventory_hostname) + 10 }}"
+
+    - name: Build list of other WireGuard nodes to test
+      ansible.builtin.set_fact:
+        other_wg_nodes: >-
+          {{
+            groups['wireguard_nodes'] |
+            reject('equalto', inventory_hostname) |
+            map('extract', hostvars, 'inventory_hostname') |
+            list
+          }}
+
+    - name: Test WireGuard connectivity to other nodes
+      ansible.builtin.shell: |
+        ping -c 1 -W 5 {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(item) + 10 }}
+      register: wg_ping_result
       changed_when: false
-      with_items:
-        - 11  # node1 bridge IP offset
-        - 12  # node2 bridge IP offset
-        - 13  # node3 bridge IP offset
-      when: inventory_hostname != "node{{ item | regex_replace('1([0-9])', '\\1') }}"
-      
-    - name: Display ping results
-      debug:
-        msg: "Ping from {{ inventory_hostname }} to {{ bridge_address_prefix }}.{{ item.item }}: {{ 'Success' if item.rc == 0 else 'Failed' }}"
-      with_items: "{{ ping_result.results }}"
-      
+      loop: "{{ other_wg_nodes }}"
+      when: other_wg_nodes | length > 0
+
+    - name: Display WireGuard ping results
+      ansible.builtin.debug:
+        msg: >-
+          WireGuard ping from {{ inventory_hostname }} ({{ current_wg_ip }}) to
+          {{ item.item }} ({{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(item.item) + 10 }}):
+          {{ 'Success' if item.rc == 0 else 'Failed' }}
+      loop: "{{ wg_ping_result.results | default([]) }}"
+      when: wg_ping_result is defined and wg_ping_result.results is defined
+
+    # Get Bridge IP addresses for all nodes
+    - name: Get Bridge IP for current node
+      ansible.builtin.set_fact:
+        current_bridge_ip: "{{ bridge_address_prefix }}.{{ groups['wireguard_nodes'].index(inventory_hostname) + 11 }}"
+
+    - name: Test bridge connectivity to other nodes
+      ansible.builtin.shell: |
+        ip a show dev {{ bridge_interface }} | grep -q "inet " &&
+        ping -c 1 -W 5 {{ bridge_address_prefix }}.{{ groups['wireguard_nodes'].index(item) + 11 }}
+      register: bridge_ping_result
+      changed_when: false
+      loop: "{{ other_wg_nodes }}"
+      when: other_wg_nodes | length > 0
+
+    - name: Display bridge ping results
+      ansible.builtin.debug:
+        msg: >-
+          Bridge ping from {{ inventory_hostname }} ({{ current_bridge_ip }}) to
+          {{ item.item }} ({{ bridge_address_prefix }}.{{ groups['wireguard_nodes'].index(item.item) + 11 }}):
+          {{ 'Success' if item.rc == 0 else 'Failed' }}
+      loop: "{{ bridge_ping_result.results | default([]) }}"
+      when: bridge_ping_result is defined and bridge_ping_result.results is defined
+
     - name: Verify Wireguard peers
-      command: wg show
+      ansible.builtin.command: wg show
       register: wg_show_result
       changed_when: false
-      
+
     - name: Display Wireguard peer information
-      debug:
+      ansible.builtin.debug:
         msg: "{{ wg_show_result.stdout_lines }}"
+
+    - name: Summary of connectivity tests
+      ansible.builtin.debug:
+        msg: |
+          === Connectivity Test Summary for {{ inventory_hostname }} ===
+          WireGuard IP: {{ current_wg_ip }}
+          Bridge IP: {{ current_bridge_ip }}
+          Total nodes in cluster: {{ groups['wireguard_nodes'] | length }}
+          Other nodes tested: {{ other_wg_nodes | length }}
