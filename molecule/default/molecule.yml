@@ -74,6 +74,8 @@ provisioner:
         wireguard_ip: 10.8.0.42
         wireguard_client_only_peers:
           - node3
+      node3:
+        bridge_ip: 172.20.0.42
 verifier:
   name: ansible
 lint: |

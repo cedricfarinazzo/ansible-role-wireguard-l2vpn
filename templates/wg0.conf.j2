@@ -7,6 +7,15 @@
 {%- endif -%}
 {%- endmacro %}
 
+{% macro get_host_bridge_ip(host) -%}
+{%- set host_override = hostvars[host]['bridge_ip'] | default('') -%}
+{%- if host_override | length > 0 -%}
+{{ host_override }}
+{%- else -%}
+{{ bridge_address_prefix }}.{{ groups['wireguard_nodes'].index(host) + 10 }}
+{%- endif -%}
+{%- endmacro %}
+
 [Interface]
 Address = {{ get_host_wireguard_ip(inventory_hostname) }}/{{ wireguard_netmask }}
 ListenPort = {{ wireguard_port }}
@@ -19,7 +28,7 @@ PostUp = ip link add {{ bridge_interface }} type bridge || true
 PostUp = ip link set {{ bridge_interface }} address 02:00:00:00:00:{{ '%02x' | format(groups['wireguard_nodes'].index(inventory_hostname) + 10) }}
 PostUp = ip link set {{ bridge_interface }} up
 PostUp = ip link set {{ vxlan_interface }} master {{ bridge_interface }}
-PostUp = ip addr add {{ bridge_address_prefix }}.{{ bridge_address_offset }}/{{ bridge_netmask }} dev {{ bridge_interface }} || true
+PostUp = ip addr add {{ get_host_bridge_ip(inventory_hostname) }}/{{ bridge_netmask }} dev {{ bridge_interface }} || true
 {% if groups['wireguard_nodes'] | length > 1 %}
 {% for host in groups['wireguard_nodes'] %}
 {% if host != inventory_hostname %}

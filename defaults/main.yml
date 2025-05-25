@@ -18,6 +18,12 @@ wireguard_persistent_keepalive: 25
 # If not set, the IP will be automatically assigned based on host index
 wireguard_ip: ""
 
+# Bridge IP address override configuration
+# Use this to override the automatic bridge IP assignment for specific hosts
+# Example: bridge_ip: "172.16.0.50"
+# If not set, the IP will be automatically assigned based on host index
+bridge_ip: ""
+
 # Advanced endpoint configuration
 # List of hosts for which this node should NOT specify endpoints
 # Useful when this node is client-only to certain peers
@@ -37,4 +43,3 @@ vxlan_multicast_group: "239.1.1.42"
 bridge_interface: br0
 bridge_address_prefix: "172.16.0"
 bridge_netmask: 24
-bridge_address_offset: "{{ groups['wireguard_nodes'].index(inventory_hostname) + 11 }}"

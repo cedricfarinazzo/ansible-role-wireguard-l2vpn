@@ -80,7 +80,11 @@ vxlan_multicast_group: "239.1.1.42"   # Multicast group for VXLAN
 bridge_interface: br0                  # Bridge interface name
 bridge_address_prefix: "172.16.0"     # IP prefix for bridge network
 bridge_netmask: 24                    # Bridge subnet mask
-bridge_address_offset: "{{ inventory_hostname | ansible.utils.hash('sha1') | regex_replace('[^0-9]','') | truncate(2, True, '') | int + 10 }}"
+
+# Bridge IP address override (set in host_vars)
+bridge_ip: ""                         # Override automatic bridge IP assignment for specific hosts
+                                       # Example: "172.16.0.50"
+                                       # If empty, IP is auto-assigned based on host index
 ```
 
 #### Endpoint Configuration
