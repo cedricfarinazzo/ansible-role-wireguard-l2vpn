@@ -1,7 +1,6 @@
 ---
 galaxy_info:
   role_name: wireguard_l2vpn
-  namespace: sedinfra
   author: cedricfarinazzo
   description: >-
     An Ansible Role that sets up a full mesh Wireguard network with

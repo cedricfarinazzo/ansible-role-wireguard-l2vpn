@@ -10,6 +10,7 @@ wireguard_port: 51820
 wireguard_interface: wg0
 wireguard_address_prefix: "10.10.10"
 wireguard_netmask: 24
+wireguard_persistent_keepalive: 25
 
 # VXLAN configuration
 vxlan_interface: vxlan0
