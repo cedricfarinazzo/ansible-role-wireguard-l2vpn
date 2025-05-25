@@ -61,6 +61,10 @@ wireguard_address_prefix: "10.10.10"   # IP prefix for mesh network
 wireguard_netmask: 24                  # Subnet mask
 wireguard_persistent_keepalive: 25     # NAT traversal
 
+# IP address override (set in host_vars)
+wireguard_ip: ""              # Override automatic IP assignment for specific hosts
+                                       # Example: "10.10.10.50"
+                                       # If empty, IP is auto-assigned based on host index
 ```
 
 #### VXLAN Configuration

@@ -1,10 +1,19 @@
+{% macro get_host_wireguard_ip(host) -%}
+{%- set host_override = hostvars[host]['wireguard_ip'] | default('') -%}
+{%- if host_override | length > 0 -%}
+{{ host_override }}
+{%- else -%}
+{{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(host) + 10 }}
+{%- endif -%}
+{%- endmacro %}
+
 [Interface]
-Address = {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(inventory_hostname) + 10 }}/{{ wireguard_netmask }}
+Address = {{ get_host_wireguard_ip(inventory_hostname) }}/{{ wireguard_netmask }}
 ListenPort = {{ wireguard_port }}
 PrivateKey = {{ wireguard_private_key }}
 
 # Create VXLAN interface and bridge on interface up
-PostUp = ip link add {{ vxlan_interface }} type vxlan id {{ vxlan_id }} local {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(inventory_hostname) + 10 }} dstport {{ vxlan_port }} dev %i
+PostUp = ip link add {{ vxlan_interface }} type vxlan id {{ vxlan_id }} local {{ get_host_wireguard_ip(inventory_hostname) }} dstport {{ vxlan_port }} dev %i
 PostUp = ip link set {{ vxlan_interface }} up
 PostUp = ip link add {{ bridge_interface }} type bridge || true
 PostUp = ip link set {{ bridge_interface }} address 02:00:00:00:00:{{ '%02x' | format(groups['wireguard_nodes'].index(inventory_hostname) + 10) }}
@@ -14,8 +23,8 @@ PostUp = ip addr add {{ bridge_address_prefix }}.{{ bridge_address_offset }}/{{ 
 {% if groups['wireguard_nodes'] | length > 1 %}
 {% for host in groups['wireguard_nodes'] %}
 {% if host != inventory_hostname %}
-PostUp = bridge fdb append 02:00:00:00:00:{{ '%02x' | format(groups['wireguard_nodes'].index(host) + 10) }} dev {{ vxlan_interface }} dst {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(host) + 10 }} || true
-PostUp = bridge fdb append 00:00:00:00:00:00 dev {{ vxlan_interface }} dst {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(host) + 10 }} || true
+PostUp = bridge fdb append 02:00:00:00:00:{{ '%02x' | format(groups['wireguard_nodes'].index(host) + 10) }} dev {{ vxlan_interface }} dst {{ get_host_wireguard_ip(host) }} || true
+PostUp = bridge fdb append 00:00:00:00:00:00 dev {{ vxlan_interface }} dst {{ get_host_wireguard_ip(host) }} || true
 {% endif %}
 {% endfor %}
 {% endif %}
@@ -30,7 +39,7 @@ PostDown = ip link del {{ bridge_interface }} || true
 [Peer]
 # {{ host }}
 PublicKey = {{ hostvars[host]['wireguard_public_key'] }}
-AllowedIPs = {{ wireguard_address_prefix }}.{{ groups['wireguard_nodes'].index(host) + 10 }}/32
+AllowedIPs = {{ get_host_wireguard_ip(host) }}/32
 {% set client_only_peers = wireguard_client_only_peers | default([]) %}
 {% if host not in client_only_peers %}
 Endpoint = {{ hostvars[host]['ansible_default_ipv4']['address'] }}:{{ wireguard_port }}
