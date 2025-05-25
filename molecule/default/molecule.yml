@@ -68,6 +68,7 @@ provisioner:
         wireguard_key_rotation_enabled: true
     host_vars:
       node1:
+        wireguard_endpoint: "{{ inventory_hostname }}"
         wireguard_client_only_peers:
           - node3
       node2:

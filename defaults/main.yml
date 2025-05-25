@@ -24,6 +24,12 @@ wireguard_ip: ""
 # If not set, the IP will be automatically assigned based on host index
 bridge_ip: ""
 
+# Endpoint override configuration
+# Use this to override the automatic endpoint assignment for specific hosts
+# Example: wireguard_endpoint: "example.com:51820" or "1.2.3.4:51820"
+# If not set, the endpoint will be automatically assigned using ansible_default_ipv4.address
+wireguard_endpoint: ""
+
 # Advanced endpoint configuration
 # List of hosts for which this node should NOT specify endpoints
 # Useful when this node is client-only to certain peers

@@ -65,6 +65,11 @@ wireguard_persistent_keepalive: 25     # NAT traversal
 wireguard_ip: ""              # Override automatic IP assignment for specific hosts
                                        # Example: "10.10.10.50"
                                        # If empty, IP is auto-assigned based on host index
+
+# Endpoint override (set in host_vars)
+wireguard_endpoint: ""                 # Override automatic endpoint assignment for specific hosts
+                                       # Example: "example.com:51820" or "1.2.3.4:51820"
+                                       # If empty, endpoint is auto-assigned using ansible_default_ipv4.address
 ```
 
 #### VXLAN Configuration
