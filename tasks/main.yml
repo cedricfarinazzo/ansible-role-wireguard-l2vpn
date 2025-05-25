@@ -52,12 +52,75 @@
     mode: '0700'
   become: true
 
-# Generate wireguard keys
-- name: Generate Wireguard private key
-  ansible.builtin.shell: wg genkey > /etc/wireguard/privatekey && chmod 600 /etc/wireguard/privatekey
-  args:
-    creates: /etc/wireguard/privatekey
+# Generate wireguard keys (with optional rotation)
+- name: Check private key age for rotation
+  ansible.builtin.stat:
+    path: /etc/wireguard/privatekey
+  register: private_key_stat
   become: true
+
+- name: Calculate key age in days
+  ansible.builtin.set_fact:
+    key_age_days: "{{ ((ansible_date_time.epoch | int) - (private_key_stat.stat.mtime | default(0))) // 86400 }}"
+  when: private_key_stat.stat.exists
+
+- name: Determine if key rotation is needed
+  ansible.builtin.set_fact:
+    rotation_needed: >-
+      {{
+        wireguard_key_rotation_enabled | bool and
+        private_key_stat.stat.exists and
+        key_age_days | int >= wireguard_key_rotation_days | int
+      }}
+
+- name: Log key rotation status
+  ansible.builtin.debug:
+    msg: >-
+      Key rotation for {{ inventory_hostname }}: 
+      {% if private_key_stat.stat.exists %}
+      Age={{ key_age_days }} days, 
+      Threshold={{ wireguard_key_rotation_days }} days, 
+      Needed={{ rotation_needed }}
+      {% else %}
+      No existing key, will generate new one
+      {% endif %}
+
+- name: Create wireguard backups directory
+  ansible.builtin.file:
+    path: /etc/wireguard/backups
+    state: directory
+    mode: '0600'
+  become: true
+  when: wireguard_key_rotation_enabled | bool
+
+- name: Backup old private key before rotation
+  ansible.builtin.copy:
+    src: "/etc/wireguard/privatekey"
+    dest: "/etc/wireguard/backups/privatekey_{{ ansible_date_time.iso8601_basic_short }}"
+    remote_src: true
+    backup: false
+    mode: "0600"
+  become: true
+  when:
+    - rotation_needed | bool
+    - private_key_stat.stat.exists
+  ignore_errors: true
+
+- name: Generate Wireguard private key (initial or rotated)
+  ansible.builtin.shell: wg genkey > /etc/wireguard/privatekey && chmod 600 /etc/wireguard/privatekey
+  become: true
+  when: not private_key_stat.stat.exists or rotation_needed | bool
+  register: key_generated
+
+- name: Log key generation
+  ansible.builtin.debug:
+    msg: >-
+      {% if not private_key_stat.stat.exists %}
+      Generated new private key for {{ inventory_hostname }}
+      {% elif rotation_needed | bool %}
+      Rotated private key for {{ inventory_hostname }} ({{ key_age_days }} days old)
+      {% endif %}
+  when: key_generated is changed
 
 - name: Read Wireguard private key
   ansible.builtin.slurp:

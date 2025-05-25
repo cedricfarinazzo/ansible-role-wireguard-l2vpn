@@ -85,6 +85,22 @@ bridge_address_offset: "{{ inventory_hostname | ansible.utils.hash('sha1') | reg
 wireguard_client_only_peers: []       # List of peer hostnames to exclude endpoints for
 ```
 
+#### Key Rotation Configuration
+```yaml
+# Automatic key rotation settings
+wireguard_key_rotation_enabled: false      # Enable automatic key rotation
+wireguard_key_rotation_days: 30            # Rotate keys every X days
+```
+
+**Key Rotation Behavior:**
+- Key rotation is checked on every Ansible run when `wireguard_key_rotation_enabled: true`
+- Keys are rotated automatically if they are older than `wireguard_key_rotation_days`
+- Old keys are automatically backed up to `/etc/wireguard/backups/` before rotation
+- After rotation, the new keys are immediately used in the mesh configuration
+- No cron jobs or background processes are created - rotation happens during deployment
+
+⚠️ Wireguard service will be restarted after key rotation introducing a short downtime.
+
 **Endpoint Behavior:**
 - By default, endpoints are included for all peers with valid IP addresses
 - Use `wireguard_client_only_peers` to specify which peer endpoints should be excluded from this node's config
@@ -197,16 +213,15 @@ This configuration means:
 
 ## 🔒 Security Considerations
 
-### Key Management
-- **Automatic Generation**: WireGuard keys are automatically generated if not provided
-- **Key Rotation**: Implement regular key rotation procedures (TODO)
+## Key Management
 
-### Network Security
+- **Automatic Generation**: WireGuard keys are automatically generated if not provided
+- **Key Rotation**: WireGuard keys are rotated automatically and old keys are backed up with a little downtime
+
+#### Network Security
 - **Encryption**: All traffic encrypted with ChaCha20Poly1305
 - **Authentication**: Cryptographic authentication prevents man-in-the-middle attacks
-- **Perfect Forward Secrecy**: Regular key rotation provides perfect forward secrecy
 - **IP Allowlists**: Configure restrictive allowed IPs for each peer
-
 
 ## 🧪 Testing
 

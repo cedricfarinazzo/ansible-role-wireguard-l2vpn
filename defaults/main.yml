@@ -17,6 +17,10 @@ wireguard_persistent_keepalive: 25
 # Useful when this node is client-only to certain peers
 wireguard_client_only_peers: []
 
+# Key rotation configuration
+wireguard_key_rotation_enabled: false      # Enable automatic key rotation
+wireguard_key_rotation_days: 30            # Rotate keys every X days
+
 # VXLAN configuration
 vxlan_interface: vxlan0
 vxlan_id: 42
