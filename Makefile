@@ -1,27 +1,74 @@
-.PHONY: test molecule-test lint help
+# Define supported distributions
+SUPPORTED_DISTROS := debian11 debian10 ubuntu2004 centos8
+DEFAULT_DISTRO := debian11
+
+.PHONY: molecule-test molecule-test-all lint help check-prereqs $(addprefix molecule-test-,$(SUPPORTED_DISTROS)) test
 
 help:
 	@echo "Available targets:"
-	@echo "  test         - Run a basic test on localhost"
-	@echo "  molecule-test - Run molecule cluster tests"
-	@echo "  lint         - Run ansible-lint"
-	@echo "  help         - Show this help message"
+	@echo "  molecule-test              - Run molecule cluster tests with default distro ($(DEFAULT_DISTRO))"
+	@echo "  test                       - Alias for molecule-test"
+	@echo "  molecule-test-all          - Run molecule tests against all supported distributions"
+	@echo "  molecule-test-<distro>     - Run molecule tests against specific distribution"
+	@echo "  lint                       - Run ansible-lint"
+	@echo "  help                       - Show this help message"
+	@echo ""
+	@echo "Supported distributions:"
+	@for distro in $(SUPPORTED_DISTROS); do \
+		echo "  - $$distro"; \
+	done
+	@echo ""
+	@echo "Examples:"
+	@echo "  make test                             # Test with $(DEFAULT_DISTRO)"
+	@echo "  make molecule-test                    # Test with $(DEFAULT_DISTRO)"
+	@echo "  make molecule-test-ubuntu2004         # Test with Ubuntu 20.04"
+	@echo "  make molecule-test-all                # Test all distributions"
 
-test:
-	ansible-playbook -i localhost, -c local tests/test.yml --check
+molecule-test: check-prereqs
+	@echo "Running molecule tests with default distribution: $(DEFAULT_DISTRO)"
+	./run-tests.sh $(DEFAULT_DISTRO)
 
-molecule-test:
-	./run-tests.sh
+# Convenience alias
+test: molecule-test
+
+molecule-test-all: check-prereqs
+	@echo "Running molecule tests against all supported distributions..."
+	@failed_distros=""; \
+	for distro in $(SUPPORTED_DISTROS); do \
+		echo ""; \
+		echo "=== Testing with $$distro ==="; \
+		if ! ./run-tests.sh $$distro; then \
+			failed_distros="$$failed_distros $$distro"; \
+		fi; \
+	done; \
+	if [ -n "$$failed_distros" ]; then \
+		echo ""; \
+		echo "❌ Tests failed for distributions:$$failed_distros"; \
+		exit 1; \
+	else \
+		echo ""; \
+		echo "✅ All distribution tests completed successfully!"; \
+	fi
+
+# Individual distribution targets
+molecule-test-debian11: check-prereqs
+	@echo "Running molecule tests with Debian 11"
+	./run-tests.sh debian11
+
+molecule-test-debian10: check-prereqs
+	@echo "Running molecule tests with Debian 10"
+	./run-tests.sh debian10
+
+molecule-test-ubuntu2004: check-prereqs
+	@echo "Running molecule tests with Ubuntu 20.04"
+	./run-tests.sh ubuntu2004
+
+molecule-test-centos8: check-prereqs
+	@echo "Running molecule tests with CentOS 8"
+	./run-tests.sh centos8
 
 lint:
 	ansible-lint
-
-# Sample targets for deploying to real hosts
-deploy-all:
-	ansible-playbook -i inventory/production wireguard.yml
-
-deploy-test:
-	ansible-playbook -i tests/inventory tests/test.yml
 
 # A target that allows to check for prerequisites
 check-prereqs:

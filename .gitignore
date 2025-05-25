@@ -10,6 +10,7 @@ __pycache__/
 
 # Ansible
 *.retry
+.ansible
 
 # IDE files
 .vscode/

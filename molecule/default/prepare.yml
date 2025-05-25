@@ -18,3 +18,17 @@
         state: present
       when: ansible_os_family == 'Debian'
       ignore_errors: true
+
+    - name: Install iputils-arping (Debian)
+      apt:
+        name: iputils-arping
+        state: present
+      when: ansible_os_family == 'Debian'
+      ignore_errors: true
+
+    - name: Install tcpdump (Debian)
+      apt:
+        name: tcpdump
+        state: present
+      when: ansible_os_family == 'Debian'
+      ignore_errors: true
