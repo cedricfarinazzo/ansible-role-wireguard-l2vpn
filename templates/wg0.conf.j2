@@ -19,7 +19,7 @@
 {% macro get_host_endpoint(host) -%}
 {%- set host_override = hostvars[host]['wireguard_endpoint'] | default('') -%}
 {%- if host_override | length > 0 -%}
-{{ host_override }}
+{{ host_override }}:{{ wireguard_port }}
 {%- else -%}
 {{ hostvars[host]['ansible_default_ipv4']['address'] }}:{{ wireguard_port }}
 {%- endif -%}
